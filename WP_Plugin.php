@@ -3,6 +3,7 @@ require 'WP_Controller.php';
 
 class WP_Plugin extends WP_Controller
 {
+  public $page;
   public $rewrite_rules = array();
   public $query_vars = array();
 
@@ -14,11 +15,9 @@ class WP_Plugin extends WP_Controller
 
   public function filter_rewrite_rules_array($rules)
   {
-    global $computravel;
-
     if(!empty($this->rewriteRules)) {
       foreach($this->rewriteRules as $pattern => $route) {
-        $rules = array($computravel->page.'/'.$pattern => 'index.php?pagename='.$computravel->page.'&controller='.$route) + $rules;
+        $rules = array($this->page.'/'.$pattern => 'index.php?pagename='.$this->page.'&controller='.$route) + $rules;
       }
     }
     return $rules;
