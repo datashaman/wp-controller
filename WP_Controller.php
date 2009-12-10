@@ -7,6 +7,8 @@ class WP_Controller
 
   public $viewPath = '';
 
+  public $owner = null;
+
   public $optionGroup = '';
   public $options = array();
 
@@ -14,9 +16,10 @@ class WP_Controller
 
   public $widgets = array();
 
-  public function __construct($config = array())
+  public function __construct($config = array(), $owner = null)
   {
     $this->reflection = new ReflectionClass($this);
+    $this->owner = $owner;
 
     $this->initConfig($config);
     $this->initMethods();
@@ -32,8 +35,10 @@ class WP_Controller
     is_readable($config) and
       $config = require($config);
 
-    foreach($config as $name => $value) {
-      $this->$name = $value;
+    if(is_array($config)) {
+      foreach($config as $name => $value) {
+        $this->$name = $value;
+      }
     }
   }
 
@@ -42,7 +47,7 @@ class WP_Controller
     foreach($this->reflection->getMethods() as $method) {
       foreach(array('filter', 'action', 'shortcode') as $type) {
         if(preg_match("/^{$type}_(.+)$/", $method->name, $match)) {
-          call_user_func("add_{$type}", $match[1], array($this, $method->name));
+          if(function_exists("add_{$type}")) call_user_func("add_{$type}", $match[1], array($this, $method->name));
         }
       }
     }
@@ -83,13 +88,18 @@ class WP_Controller
       $class = $config['class'];
       $widget = new $class($this->optionGroup.'-'.$id, $config['name'], $config['widget_options'], $config['control_options']);
       $wp_widget_factory->widgets[$config['class']] = $widget;
+      property_exists($widget, 'controller') and $widget->controller = $this;
     }
   }
 
   public function __get($name)
   {
     if(in_array($name, $this->options)) {
-      return get_option($this->optionGroup.'-'.$name);
+      if(function_exists('get_option')) {
+        return get_option($this->optionGroup.'-'.$name);
+      } else {
+        return $this->_options[$name];
+      }
     }
     throw new Exception("Trying to get invalid property $name");
   }
@@ -97,7 +107,11 @@ class WP_Controller
   public function __set($name, $value)
   {
     if(in_array($name, $this->options)) {
-      update_option($this->optionGroup.'-'.$name, $value);
+      if(function_exists('update_option')) {
+        update_option($this->optionGroup.'-'.$name, $value);
+      } else {
+        $this->_options[$name] = $value;
+      }
       return $value;
     }
     throw new Exception("Trying to set invalid property $name");
